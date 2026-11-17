@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Absensi Siswa dengan wajah</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        body {
+            background: #f1f5f9;
+            min-height: 100vh;
+        }
+
+        header {
+            background: #2563eb;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 30px auto;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        }
+
+        .camera-box {
+            position: relative;
+            max-width: 650px;
+            margin: auto;
+            background: #111827;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        video {
+            width: 100%;
+            display: block;
+        }
+
+        canvas {
+            display: none;
+        }
+
+        .camera-status {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 20px;
+        }
+
+        .data-siswa {
+            margin-top: 25px;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .data {
+            background: #f8fafc;
+            padding: 15px;
+            border-radius: 10px;
+        }
+
+        .label {
+            color: #64748b;
+            font-size: 14px;
+        }
+
+        .value {
+            margin-top: 5px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        .status {
+            color: #16a34a;
+        }
+
+        .buttons {
+            margin-top: 25px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        button {
+            border: none;
+            padding: 13px 25px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: bold;
+        }
+
+        .btn-start {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-absen {
+            background: #16a34a;
+            color: white;
+        }
+
+        .btn-stop {
+            background: #dc2626;
+            color: white;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .notification {
+            display: none;
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 10px;
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        @media (max-width: 600px) {
+            .data-siswa {
+                grid-template-columns: 1fr;
+            }
+
+            .buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <h1>📚 Sistem Absensi Siswa</h1>
+    <p>Absensi wajah anda</p>
+</header>
+
+<div class="container">
+
+    <div class="card">
+
+        <h2>📷 Kamera Absensi</h2>
+
+        <br>
+
+        <div class="camera-box">
+
+            <video id="camera" autoplay playsinline></video>
+
+            <div class="camera-status" id="cameraStatus">
+                Kamera belum aktif
+            </div>
+
+        </div>
+
+        <canvas id="canvas"></canvas>
+
+        <div class="buttons">
+
+            <button
+                class="btn-start"
+                onclick="mulaiKamera()">
+                ▶ Mulai Kamera
+            </button>
+
+            <button
+                class="btn-absen"
+                id="btnAbsen"
+                onclick="ambilWajah()"
+                disabled>
+                ✓ Absen Sekarang
+            </button>
+
+            <button
+                class="btn-stop"
+                onclick="hentikanKamera()">
+                ■ Matikan Kamera
+            </button>
+
+        </div>
+
+        <div class="data-siswa">
+
+            <div class="data">
+                <div class="label">Nama Siswa</div>
+                <div class="value" id="nama">
+                    -
+                </div>
+            </div>
+
+            <div class="data">
+                <div class="label">Kelas</div>
+                <div class="value" id="kelas">
+                    -
+                </div>
+            </div>
+
+            <div class="data">
+                <div class="label">Status</div>
+                <div class="value status" id="status">
+                    Belum Absen
+                </div>
+            </div>
+
+            <div class="data">
+                <div class="label">Waktu</div>
+                <div class="value" id="waktu">
+                    -
+                </div>
+            </div>
+
+        </div>
+
+        <div
+            class="notification"
+            id="notification">
+
+            🔔 <strong>Notifikasi terkirim!</strong>
+
+            <br>
+
+            Orang tua siswa telah menerima
+            pemberitahuan bahwa siswa hadir
+            di sekolah.
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+    let stream = null;
+
+    const video =
+        document.getElementById("camera");
+
+    const canvas =
+        document.getElementById("canvas");
+
+    const cameraStatus =
+        document.getElementById("cameraStatus");
+
+    const btnAbsen =
+        document.getElementById("btnAbsen");
+
+
+    // =========================
+    // MULAI KAMERA
+    // =========================
+
+    async function mulaiKamera() {
+
+        try {
+
+            stream =
+                await navigator.mediaDevices
+                    .getUserMedia({
+                        video: true,
+                        audio: false
+                    });
+
+            video.srcObject = stream;
+
+            cameraStatus.innerText =
+                "Kamera aktif";
+
+            btnAbsen.disabled = false;
+
+        } catch (error) {
+
+            console.error(error);
+
+            alert(
+                "Kamera tidak dapat digunakan."
+            );
+
+        }
+    }
+
+
+    // =========================
+    // MATIKAN KAMERA
+    // =========================
+
+    function hentikanKamera() {
+
+        if (stream) {
+
+            stream.getTracks().forEach(
+                track => track.stop()
+            );
+
+            stream = null;
+        }
+
+        video.srcObject = null;
+
+        cameraStatus.innerText =
+            "Kamera tidak aktif";
+
+        btnAbsen.disabled = true;
+    }
+
+
+    // =========================
+    // AMBIL FOTO WAJAH
+    // =========================
+
+    async function ambilWajah() {
+
+        if (!stream) {
+
+            alert(
+                "Silakan aktifkan kamera terlebih dahulu."
+            );
+
+            return;
+        }
+
+        const context =
+            canvas.getContext("2d");
+
+        canvas.width =
+            video.videoWidth;
+
+        canvas.height =
+            video.videoHeight;
+
+        context.drawImage(
+            video,
+            0,
+            0,
+            canvas.width,
+            canvas.height
+        );
+
+        // Mengubah gambar menjadi file
+        const imageData =
+            canvas.toDataURL("image/jpeg");
+
+        try {
+
+            // Kirim gambar ke backend
+            const response =
+                await fetch(
+                    "/api/absensi",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+                            image: imageData
+                        })
+                    }
+                );
+
+            const result =
+                await response.json();
+
+            if (result.success) {
+
+                tampilkanHasil(result);
+
+            } else {
+
+                alert(
+                    result.message ||
+                    "Wajah tidak dikenali."
+                );
+            }
+
+        } catch (error) {
+
+            console.error(error);
+
+            alert(
+                "Server tidak dapat dihubungi."
+            );
+        }
+    }
+
+
+    // =========================
+    // TAMPILKAN HASIL
+    // =========================
+
+    function tampilkanHasil(data) {
+
+        document.getElementById("nama")
+            .innerText = data.nama;
+
+        document.getElementById("kelas")
+            .innerText = data.kelas;
+
+        document.getElementById("status")
+            .innerText = data.status;
+
+        document.getElementById("waktu")
+            .innerText = data.waktu;
+
+        document.getElementById("notification")
+            .style.display = "block";
+    }
+
+</script>
+
+</body>
+</html>
